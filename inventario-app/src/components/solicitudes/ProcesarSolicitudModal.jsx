@@ -14,6 +14,8 @@ export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar,
   const [mostrarAgregar, setMostrarAgregar] = useState(false)
   const [busquedaProducto, setBusquedaProducto] = useState('')
   const [productosOriginales, setProductosOriginales] = useState([])
+  // Map of productoId -> stock (loaded via calcularStockDisponible for accuracy)
+  const [stockMap, setStockMap] = useState({})
 
   // Cargar productos para nombres
   const { data: productos = [] } = useQuery({
@@ -21,21 +23,20 @@ export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar,
     queryFn: () => dataService.getProductos()
   })
 
-  // Cargar inventario de la ubicación origen
+  // Cargar inventario de la ubicación origen (mantener como fallback de catálogo para agregar productos)
   const { data: inventarioOrigen = [] } = useQuery({
     queryKey: ['inventario', solicitud?.ubicacion_origen_id],
     queryFn: () => solicitud?.ubicacion_origen_id ? dataService.getInventario(solicitud.ubicacion_origen_id) : [],
     enabled: !!solicitud?.ubicacion_origen_id
   })
 
-  // Cargar detalles de la solicitud
+  // Cargar detalles de la solicitud y luego consultar stock real por producto
   useEffect(() => {
     const loadDetalles = async () => {
       if (!solicitud?.id) return
       setLoadingDetalles(true)
       try {
         const detalles = await dataService.getDetalleSolicitudes(solicitud.id)
-        // Inicializar productos aprobados con las cantidades solicitadas
         const productosIniciales = detalles.map(d => ({
           detalle_id: d.id,
           producto_id: d.producto_id,
@@ -46,18 +47,30 @@ export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar,
         }))
         setProductosAprobados(productosIniciales)
         setProductosOriginales(productosIniciales)
-      } catch (error) {
-        console.error('Error cargando detalles:', error)
+
+        // Consultar stock disponible real por cada producto usando calcularStockDisponible
+        if (solicitud.ubicacion_origen_id && productosIniciales.length > 0) {
+          const stockEntries = await Promise.all(
+            productosIniciales.map(async (p) => {
+              const stock = await dataService.calcularStockDisponible(p.producto_id, solicitud.ubicacion_origen_id)
+              return [p.producto_id, stock]
+            })
+          )
+          setStockMap(Object.fromEntries(stockEntries))
+        }
+      } catch (err) {
+        console.error('Error cargando detalles:', err)
         setError('Error cargando los detalles de la solicitud')
       } finally {
         setLoadingDetalles(false)
       }
     }
     loadDetalles()
-  }, [solicitud?.id])
+  }, [solicitud?.id, solicitud?.ubicacion_origen_id])
 
-  // Obtener stock de un producto en la ubicación origen
+  // Obtener stock usando calcularStockDisponible (cargado en stockMap) con fallback a inventarioOrigen
   const getStockOrigen = (productoId) => {
+    if (productoId in stockMap) return stockMap[productoId]
     const inv = inventarioOrigen.find(i => i.producto_id === productoId)
     if (!inv) return 0
     return inv.stock_actual ?? inv.cantidad ?? 0
@@ -109,7 +122,10 @@ export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar,
       return
     }
 
-    // Agregar producto a la lista
+    // Cargar stock real para el nuevo producto y agregarlo a la lista
+    dataService.calcularStockDisponible(producto.id, solicitud.ubicacion_origen_id)
+      .then(stock => setStockMap(prev => ({ ...prev, [producto.id]: stock })))
+
     setProductosAprobados(prev => [...prev, {
       producto_id: producto.id,
       cantidad_solicitada: 0,

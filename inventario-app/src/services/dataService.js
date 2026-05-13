@@ -37,6 +37,11 @@ const dataService = {
     return await firestoreService.getInventario(ubicacionId, tipoUbicacion)
   },
 
+  // Stock disponible centralizado (fuente única de verdad, con diagnóstico)
+  calcularStockDisponible: async (productoId, ubicacionId) => {
+    return await firestoreService.calcularStockDisponible(productoId, ubicacionId)
+  },
+
   // Movimientos
   getMovimientos: async (ubicacionId) => {
     return await firestoreService.getMovimientos(ubicacionId)

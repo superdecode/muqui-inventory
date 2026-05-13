@@ -149,7 +149,7 @@ export default function Sidebar() {
           </div>
 
           {/* Menu items */}
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <nav className="sidebar-nav flex-1 p-4 space-y-2 overflow-y-auto">
             {menuItems.map((item) => {
               const hasSubmenu = item.submenu && item.submenu.length > 0
               const menuKey = item.to.replace('/', '') || 'home'

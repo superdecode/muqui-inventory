@@ -1523,6 +1523,35 @@ const firestoreService = {
   },
 
   /**
+   * Fuente única de verdad para stock disponible de un producto en una ubicación.
+   * Lee el campo stock_actual con fallback a cantidad, loggea diagnóstico.
+   */
+  calcularStockDisponible: async (productoId, ubicacionId) => {
+    try {
+      const db = getDB()
+      const invQuery = query(
+        collection(db, 'inventario'),
+        where('producto_id', '==', productoId),
+        where('ubicacion_id', '==', ubicacionId)
+      )
+      const snap = await getDocs(invQuery)
+
+      if (snap.empty) {
+        console.debug(`[stock] producto=${productoId} ubicacion=${ubicacionId} → sin registro → 0`)
+        return 0
+      }
+
+      const data = snap.docs[0].data()
+      const stock = data.stock_actual ?? data.cantidad ?? 0
+      console.debug(`[stock] producto=${productoId} ubicacion=${ubicacionId} stock_actual=${data.stock_actual} cantidad=${data.cantidad} → ${stock}`)
+      return typeof stock === 'number' ? stock : (Number(stock) || 0)
+    } catch (err) {
+      console.error('[stock] Error en calcularStockDisponible:', err)
+      return 0
+    }
+  },
+
+  /**
    * Obtener insumos de producción para un movimiento
    */
   getInsumosProduccion: async (movimientoId) => {
