@@ -1187,9 +1187,12 @@ const firestoreService = {
             // Actualizar inventario existente
             const inventarioDoc = inventarioSnapshot.docs[0]
             const inventarioActual = inventarioDoc.data()
+            const stockBase = inventarioActual.stock_actual ?? inventarioActual.cantidad ?? 0
+            const nuevoStock = stockBase + parseFloat(prod.cantidad)
             const inventarioRef = doc(db, 'inventario', inventarioDoc.id)
             batch.update(inventarioRef, {
-              cantidad: (inventarioActual.cantidad || 0) + parseFloat(prod.cantidad),
+              stock_actual: nuevoStock,
+              cantidad: nuevoStock,
               fecha_actualizacion: Timestamp.now()
             })
           } else {
@@ -1198,6 +1201,7 @@ const firestoreService = {
             batch.set(inventarioRef, {
               ubicacion_id: data.destino_id,
               producto_id: prod.producto_id,
+              stock_actual: parseFloat(prod.cantidad),
               cantidad: parseFloat(prod.cantidad),
               fecha_actualizacion: Timestamp.now()
             })
@@ -1329,6 +1333,25 @@ const firestoreService = {
       const insumosSnapshot = await getDocs(insumosQuery)
       const insumos = insumosSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
 
+      // Validate sufficient stock for all insumos before modifying anything
+      for (const insumo of insumos) {
+        const invQuery = query(
+          collection(db, 'inventario'),
+          where('ubicacion_id', '==', ubicacionId),
+          where('producto_id', '==', insumo.producto_id)
+        )
+        const invSnapshot = await getDocs(invQuery)
+        const stockActual = invSnapshot.empty
+          ? 0
+          : (() => {
+              const d = invSnapshot.docs[0].data()
+              return d.stock_actual ?? d.cantidad ?? 0
+            })()
+        if (stockActual < parseFloat(insumo.cantidad)) {
+          throw new Error(`Stock insuficiente para insumo ${insumo.producto_id}: disponible ${stockActual}, requerido ${insumo.cantidad}`)
+        }
+      }
+
       // 1. Incrementar inventario de productos producidos
       for (const detalle of detallesProducidos) {
         const cantidadProducida = detalle.cantidad_enviada ?? detalle.cantidad
@@ -1348,8 +1371,11 @@ const firestoreService = {
         if (!invSnapshot.empty) {
           const invDoc = invSnapshot.docs[0]
           const invActual = invDoc.data()
+          const stockBase = invActual.stock_actual ?? invActual.cantidad ?? 0
+          const nuevoStock = stockBase + parseFloat(cantidadProducida)
           batch.update(doc(db, 'inventario', invDoc.id), {
-            cantidad: (invActual.cantidad || 0) + parseFloat(cantidadProducida),
+            stock_actual: nuevoStock,
+            cantidad: nuevoStock,
             fecha_actualizacion: Timestamp.now()
           })
         } else {
@@ -1357,6 +1383,7 @@ const firestoreService = {
           batch.set(invRef, {
             ubicacion_id: ubicacionId,
             producto_id: detalle.producto_id,
+            stock_actual: parseFloat(cantidadProducida),
             cantidad: parseFloat(cantidadProducida),
             fecha_actualizacion: Timestamp.now()
           })
@@ -1375,8 +1402,10 @@ const firestoreService = {
         if (!invSnapshot.empty) {
           const invDoc = invSnapshot.docs[0]
           const invActual = invDoc.data()
-          const nuevoStock = Math.max(0, (invActual.cantidad || 0) - parseFloat(insumo.cantidad))
+          const stockBase = invActual.stock_actual ?? invActual.cantidad ?? 0
+          const nuevoStock = Math.max(0, stockBase - parseFloat(insumo.cantidad))
           batch.update(doc(db, 'inventario', invDoc.id), {
+            stock_actual: nuevoStock,
             cantidad: nuevoStock,
             fecha_actualizacion: Timestamp.now()
           })
@@ -1561,9 +1590,13 @@ const firestoreService = {
         ])
 
         if (inventarioOrigen.length > 0) {
-          const invOrigenRef = doc(db, 'inventario', inventarioOrigen[0].id)
+          const invOrigenData = inventarioOrigen[0]
+          const stockOrigenActual = invOrigenData.stock_actual ?? invOrigenData.cantidad ?? 0
+          const nuevoStockOrigen = Math.max(0, stockOrigenActual - cantidadEnviada)
+          const invOrigenRef = doc(db, 'inventario', invOrigenData.id)
           batch.update(invOrigenRef, {
-            stock_actual: inventarioOrigen[0].stock_actual - cantidadEnviada,
+            stock_actual: nuevoStockOrigen,
+            cantidad: nuevoStockOrigen,
             ultima_actualizacion: serverTimestamp()
           })
         }
@@ -1575,9 +1608,13 @@ const firestoreService = {
         ])
 
         if (inventarioDestino.length > 0) {
-          const invDestinoRef = doc(db, 'inventario', inventarioDestino[0].id)
+          const invDestinoData = inventarioDestino[0]
+          const stockDestinoActual = invDestinoData.stock_actual ?? invDestinoData.cantidad ?? 0
+          const nuevoStockDestino = stockDestinoActual + cantidadRecibida
+          const invDestinoRef = doc(db, 'inventario', invDestinoData.id)
           batch.update(invDestinoRef, {
-            stock_actual: inventarioDestino[0].stock_actual + cantidadRecibida,
+            stock_actual: nuevoStockDestino,
+            cantidad: nuevoStockDestino,
             ultima_actualizacion: serverTimestamp()
           })
         } else {
@@ -1586,6 +1623,7 @@ const firestoreService = {
             producto_id: detalle.producto_id,
             ubicacion_id: movimiento.destino_id,
             stock_actual: cantidadRecibida,
+            cantidad: cantidadRecibida,
             ultima_actualizacion: serverTimestamp()
           })
         }

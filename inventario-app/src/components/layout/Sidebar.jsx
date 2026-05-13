@@ -117,13 +117,13 @@ export default function Sidebar() {
         className={`
           fixed lg:static inset-y-0 left-0 z-40
           bg-gradient-to-b from-[#004AFF] to-[#002980] text-white
-          transform transition-all duration-300 ease-in-out
+          transform transition-all duration-300 ease-in-out overflow-hidden
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}
-          w-64
+          w-64 h-screen lg:h-full
         `}
       >
-        <div className="flex flex-col h-full relative">
+        <div className="flex flex-col h-full relative overflow-hidden">
           {/* Collapse button for large screens */}
           <button
             onClick={toggleCollapse}
@@ -149,7 +149,7 @@ export default function Sidebar() {
           </div>
 
           {/* Menu items */}
-          <nav className="flex-1 p-4 space-y-2">
+          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {menuItems.map((item) => {
               const hasSubmenu = item.submenu && item.submenu.length > 0
               const menuKey = item.to.replace('/', '') || 'home'

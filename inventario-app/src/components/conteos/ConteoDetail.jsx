@@ -369,12 +369,12 @@ export default function ConteoDetail({ conteo, onClose, onEdit, onCancelar, isCa
                     : conteo.estado === 'COMPLETADO'
                     ? 'bg-green-500 text-white'
                     : conteo.estado === 'PARCIALMENTE_COMPLETADO'
-                    ? 'bg-orange-500 text-white'
+                    ? 'bg-green-400 text-white'
                     : conteo.estado === 'CANCELADO'
                     ? 'bg-red-500 text-white'
                     : 'bg-yellow-500 text-white'
                 }`}>
-                  {conteo.estado === 'PARCIALMENTE_COMPLETADO' ? 'PARCIAL' : conteo.estado}
+                  {conteo.estado === 'PARCIALMENTE_COMPLETADO' ? 'PARCIAL COMPLETADO' : conteo.estado}
                 </span>
                 {(conteo.estado === 'COMPLETADO' || conteo.estado === 'PARCIALMENTE_COMPLETADO') && detalles.length > 0 && (
                   <button

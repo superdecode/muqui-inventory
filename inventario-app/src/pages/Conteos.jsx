@@ -448,7 +448,7 @@ export default function Conteos() {
         const estados = {
           PENDIENTE: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
           EN_PROGRESO: { color: 'bg-blue-100 text-blue-800', icon: AlertCircle },
-          PARCIALMENTE_COMPLETADO: { color: 'bg-orange-100 text-orange-800', icon: AlertCircle },
+          PARCIALMENTE_COMPLETADO: { color: 'bg-green-100 text-green-700', icon: AlertCircle },
           COMPLETADO: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
           CANCELADO: { color: 'bg-red-100 text-red-800', icon: XCircle }
         }
@@ -457,7 +457,7 @@ export default function Conteos() {
         return (
           <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${estado.color}`}>
             <Icon size={14} />
-            {value === 'PARCIALMENTE_COMPLETADO' ? 'Parcial' : formatLabel(value)}
+            {value === 'PARCIALMENTE_COMPLETADO' ? 'Parcial Completado' : formatLabel(value)}
           </span>
         )
       }

@@ -59,7 +59,8 @@ export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar,
   // Obtener stock de un producto en la ubicación origen
   const getStockOrigen = (productoId) => {
     const inv = inventarioOrigen.find(i => i.producto_id === productoId)
-    return inv?.stock_actual || 0
+    if (!inv) return 0
+    return inv.stock_actual ?? inv.cantidad ?? 0
   }
 
   // Obtener nombre del producto
