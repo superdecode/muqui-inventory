@@ -14,10 +14,79 @@ import dataService from '../services/dataService'
 import { buildEquivalenceMap, getCompatibleUnits, calcCostInConsumptionUnit, convertUnits } from '../utils/unitConversion'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import Button from '../components/common/Button'
-import UoMBadge from '../components/common/UoMBadge'
 import ConfirmModal from '../components/common/ConfirmModal'
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
+
+const normalizeHeader = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]+/g, '_')
+  .replace(/^_|_$/g, '')
+
+const parseBool = (value, defaultValue = true) => {
+  if (value === '' || value == null) return defaultValue
+  const normalized = String(value).trim().toLowerCase()
+  if (['si', 'sí', 'true', '1', 'activo', 'activa', 'yes'].includes(normalized)) return true
+  if (['no', 'false', '0', 'inactivo', 'inactiva'].includes(normalized)) return false
+  return defaultValue
+}
+
+const parseNumberOrNull = (value) => {
+  if (value === '' || value == null) return null
+  const parsed = parseFloat(String(value).replace(',', '.'))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const unitDisplayName = (unit) => unit ? (unit.abreviatura || unit.simbolo || unit.nombre || unit.id) : ''
+
+function resolveUnit(unidadesDB, value) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  const normalized = raw.toLowerCase()
+  return unidadesDB.find(u =>
+    String(u.id || '').toLowerCase() === normalized ||
+    String(u.nombre || '').toLowerCase() === normalized ||
+    String(u.abreviatura || '').toLowerCase() === normalized ||
+    String(u.simbolo || '').toLowerCase() === normalized
+  ) || null
+}
+
+function compareValues(a, b) {
+  const emptyA = a == null || a === ''
+  const emptyB = b == null || b === ''
+  if (emptyA && emptyB) return 0
+  if (emptyA) return 1
+  if (emptyB) return -1
+  if (a instanceof Date || b instanceof Date) return new Date(a) - new Date(b)
+  const numA = typeof a === 'number' ? a : parseFloat(a)
+  const numB = typeof b === 'number' ? b : parseFloat(b)
+  if (!Number.isNaN(numA) && !Number.isNaN(numB) && String(a).trim?.() !== '' && String(b).trim?.() !== '') return numA - numB
+  return String(a).localeCompare(String(b), 'es', { sensitivity: 'base', numeric: true })
+}
+
+function SortableHeader({ label, column, sortConfig, onSort, align = 'left', className = '' }) {
+  const active = sortConfig?.column === column
+  const direction = active ? sortConfig.direction : null
+  const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
+  const justifyClass = align === 'right' ? 'justify-end w-full' : align === 'center' ? 'justify-center w-full' : ''
+  return (
+    <th
+      onClick={() => onSort(column)}
+      className={`${className} px-4 py-3 ${alignClass} text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide cursor-pointer hover:text-primary-600 select-none`}
+    >
+      <span className={`inline-flex items-center gap-1 ${justifyClass}`}>
+        {label}
+        <span className="flex flex-col -space-y-1">
+          <ChevronUp size={10} className={active && direction === 'asc' ? 'text-primary-600' : 'text-slate-300'} />
+          <ChevronDown size={10} className={active && direction === 'desc' ? 'text-primary-600' : 'text-slate-300'} />
+        </span>
+      </span>
+    </th>
+  )
+}
 
 function calcularCostoTotal(ingredientes = []) {
   return ingredientes.reduce((s, i) => s + (i.costo_unitario || 0) * (i.cantidad || 0), 0)
@@ -30,15 +99,29 @@ function fmtCosto(n) {
 function exportarRecetarios(recetarios) {
   if (!recetarios || recetarios.length === 0) return 0
 
-  const dataToExport = recetarios.map(rec => ({
+  const dataToExport = recetarios.flatMap(rec => {
+    const ingredientes = rec.ingredientes?.length ? rec.ingredientes : [null]
+    return ingredientes.map((ing, idx) => ({
     'ID Interno': rec.id || '',
     'Nombre': rec.nombre || '',
     'SKU Odoo': rec.sku_odoo || '',
     'SKU Template': rec.sku_template || '',
-    'Cantidad Ingredientes': rec.ingredientes?.length || 0,
+      'Activo': rec.activo !== false ? 'Sí' : 'No',
+      'Ingrediente #': ing ? idx + 1 : '',
+      'Ingrediente': ing?.nombre || '',
+      'SKU Ing': ing?.sku || '',
+      'Producto ID': ing?.producto_id || '',
+      'Cantidad Uso': ing?.cantidad || '',
+      'Unidad Uso': ing?.unidad_medida || '',
+      'Unidad Uso ID': ing?.consumption_unit_id || '',
+      'UoM Compra': ing?.especificacion || '',
+      'UoM Compra ID': ing?.purchase_unit_id || '',
+      'Cant x Compra': ing?.purchase_unit_qty || '',
+      'Costo Unitario': ing?.costo_unitario || '',
+      'Subtotal': ing ? ((ing.subtotal_efectivo ?? (ing.costo_unitario || 0) * (ing.cantidad || 0))) : '',
     'Costo Total': rec.costo_total || 0,
-    'Activo': rec.activo !== false ? 'Sí' : 'No'
-  }))
+    }))
+  })
 
   const ws = XLSX.utils.json_to_sheet(dataToExport)
   const wb = XLSX.utils.book_new()
@@ -51,59 +134,91 @@ function parseExcelRecetarios(buffer, productos = [], unidadesDB = []) {
   const wb = XLSX.read(buffer, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-  const dataRows = rows.slice(1).filter(r => r[0] || r[1])
+  const headerRow = rows[0] || []
+  const headerMap = new Map(headerRow.map((h, idx) => [normalizeHeader(h), idx]))
+  const dataRows = rows.slice(1).filter(r => r.some(cell => String(cell || '').trim()))
 
-  // Build lookup by codigo_legible (uppercase) for auto-linking
-  const prodByCodigo = new Map()
-  for (const p of productos) {
-    if (p.codigo_legible) prodByCodigo.set(p.codigo_legible.toUpperCase(), p)
+  const col = (aliases, fallbackIndex) => {
+    for (const alias of aliases) {
+      const idx = headerMap.get(normalizeHeader(alias))
+      if (idx !== undefined) return idx
+    }
+    return fallbackIndex
   }
 
+  const idxNombre = col(['Producto', 'Nombre'], 0)
+  const idxSkuOdoo = col(['SKU_Odoo', 'SKU Odoo'], 1)
+  const idxIngNombre = col(['Ingrediente'], 2)
+  const idxIngSku = col(['SKU_Ing (codigo_legible)', 'SKU_Ing', 'SKU Ing'], 3)
+  const idxCantidad = col(['Cantidad Uso', 'Cantidad'], 4)
+  const idxUnidadUso = col(['Unidad Uso', 'Unidad'], 5)
+  const idxPurchaseQty = col(['Cant x Compra', 'Cant. por Unidad', 'Cant Compra'], 6)
+  const idxCosto = col(['Costo Unitario', 'Costo_Unit', 'Costo Unit'], 7)
+  const idxSkuTemplate = col(['SKU Template', 'SKU_Template'], -1)
+  const idxActivo = col(['Activo'], -1)
+  const idxProductoId = col(['Producto ID', 'ID Producto'], -1)
+  const idxUnidadUsoId = col(['Unidad Uso ID', 'Consumption Unit ID'], -1)
+  const idxPurchaseUnit = col(['UoM Compra', 'Unidad Compra'], -1)
+  const idxPurchaseUnitId = col(['UoM Compra ID', 'Purchase Unit ID'], -1)
+
+  const prodByKey = new Map()
+  for (const p of productos) {
+    const keys = [p.id, p.codigo_legible, p.sku, p.nombre].filter(Boolean)
+    keys.forEach(k => prodByKey.set(String(k).trim().toUpperCase(), p))
+  }
+
+  const get = (row, idx) => idx >= 0 ? row[idx] : ''
   const map = new Map()
   for (const row of dataRows) {
-    const nombre    = String(row[0] || '').trim()
-    const skuOdoo   = String(row[1] || '').trim().toUpperCase()
-    const ingNombre = String(row[2] || '').trim()
-    const ingSku    = String(row[3] || '').trim().toUpperCase()
-    const cantidad  = parseFloat(row[4]) || 0
-    const unidad    = String(row[5] || '').trim()
-    const purchaseUnitQty = parseFloat(row[6]) || null
-    const costoRaw  = parseFloat(row[7]) || 0
+    const nombre = String(get(row, idxNombre) || '').trim()
+    const skuOdoo = String(get(row, idxSkuOdoo) || '').trim().toUpperCase()
+    const skuTemplate = String(get(row, idxSkuTemplate) || '').trim().toUpperCase()
+    const ingNombre = String(get(row, idxIngNombre) || '').trim()
+    const ingSku = String(get(row, idxIngSku) || '').trim().toUpperCase()
+    const productoId = String(get(row, idxProductoId) || '').trim()
+    const cantidad = parseNumberOrNull(get(row, idxCantidad)) || 0
+    const unidadUso = String(get(row, idxUnidadUso) || '').trim()
+    const unidadUsoId = String(get(row, idxUnidadUsoId) || '').trim()
+    const purchaseUnitRaw = String(get(row, idxPurchaseUnit) || '').trim()
+    const purchaseUnitIdRaw = String(get(row, idxPurchaseUnitId) || '').trim()
+    const purchaseUnitQtyRaw = parseNumberOrNull(get(row, idxPurchaseQty))
+    const costoRaw = parseNumberOrNull(get(row, idxCosto)) || 0
+    const activo = parseBool(get(row, idxActivo), true)
 
-    // Resolve unit_id from unidadesDB
-    let resolvedUnitId = null
-    let unitError = null
-    if (unidad) {
-      const uStr = unidad.toLowerCase()
-      const matched = unidadesDB.find(u =>
-        u.nombre?.toLowerCase() === uStr ||
-        u.abreviatura?.toLowerCase() === uStr ||
-        u.simbolo?.toLowerCase() === uStr
-      )
-      if (matched) {
-        resolvedUnitId = matched.id
-      } else {
-        unitError = `Unidad "${unidad}" no encontrada`
-      }
-    }
-
-    const costo = costoRaw
     if (!skuOdoo || !ingNombre) continue
-    if (!map.has(skuOdoo)) map.set(skuOdoo, { nombre, sku_odoo: skuOdoo, ingredientes: [] })
+    if (!map.has(skuOdoo)) map.set(skuOdoo, { nombre, sku_odoo: skuOdoo, sku_template: skuTemplate, activo, ingredientes: [] })
+    const receta = map.get(skuOdoo)
+    if (nombre && !receta.nombre) receta.nombre = nombre
+    if (skuTemplate && !receta.sku_template) receta.sku_template = skuTemplate
+    receta.activo = activo
 
-    // Auto-link: match SKU_Ing against producto.codigo_legible
-    const matchedProd = ingSku ? prodByCodigo.get(ingSku) : null
-    map.get(skuOdoo).ingredientes.push({
+    const matchedProd = prodByKey.get(productoId.toUpperCase()) || prodByKey.get(ingSku) || prodByKey.get(ingNombre.toUpperCase()) || null
+    const purchaseUnit = resolveUnit(unidadesDB, purchaseUnitIdRaw) || resolveUnit(unidadesDB, purchaseUnitRaw)
+    const consumptionUnit = resolveUnit(unidadesDB, unidadUsoId) || resolveUnit(unidadesDB, unidadUso)
+    const purchaseUnitId = purchaseUnit?.id || matchedProd?.purchase_unit_id || ''
+    const consumptionUnitId = consumptionUnit?.id || (unidadUsoId === '__presentation__' ? '__presentation__' : '') || purchaseUnitId
+    const purchaseUnitQty = purchaseUnitQtyRaw ?? matchedProd?.purchase_unit_qty ?? null
+    const unitError = (unidadUso && !consumptionUnit && unidadUsoId !== '__presentation__')
+      ? `Unidad de uso "${unidadUso}" no encontrada`
+      : null
+    const purchaseUnitError = ((purchaseUnitRaw || purchaseUnitIdRaw) && !purchaseUnit)
+      ? `UoM compra "${purchaseUnitRaw || purchaseUnitIdRaw}" no encontrada`
+      : null
+
+    receta.ingredientes.push({
       nombre: matchedProd ? matchedProd.nombre : ingNombre,
-      sku: ingSku || null,
+      sku: ingSku || matchedProd?.codigo_legible || matchedProd?.id || null,
       producto_id: matchedProd ? matchedProd.id : null,
-      especificacion: matchedProd?.especificacion || '',
+      especificacion: matchedProd?.especificacion || (purchaseUnitQty && purchaseUnit ? `${purchaseUnitQty} ${unitDisplayName(purchaseUnit)}`.trim() : purchaseUnitRaw),
       cantidad,
-      unidad_medida: matchedProd ? (matchedProd.unidad_medida || unidad) : unidad,
-      costo_unitario: matchedProd ? (matchedProd.costo_unidad || costo) : costo,
-      purchase_unit_id: resolvedUnitId,
+      unidad_medida: consumptionUnitId === '__presentation__'
+        ? `Unidad (${purchaseUnitQty || matchedProd?.purchase_unit_qty || 1} ${unitDisplayName(purchaseUnit) || matchedProd?.unidad_medida || ''})`.trim()
+        : (consumptionUnit?.nombre || matchedProd?.unidad_medida || unidadUso),
+      costo_unitario: matchedProd ? (parseFloat(matchedProd.costo_unidad) || costoRaw) : costoRaw,
+      purchase_unit_id: purchaseUnitId,
       purchase_unit_qty: purchaseUnitQty,
-      unit_error: unitError,
+      consumption_unit_id: consumptionUnitId,
+      unit_error: unitError || purchaseUnitError,
     })
   }
   return Array.from(map.values())
@@ -191,16 +306,8 @@ function TabRecetas() {
   const [importando, setImportando] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null) // { id, nombre }
   const [confirmDuplicate, setConfirmDuplicate] = useState(null) // { id, nombre }
+  const [sortRecetas, setSortRecetas] = useState({ column: 'nombre', direction: 'asc' })
   const fileRef = useRef()
-
-  const recetasFiltradas = (recetarios || []).filter(r => {
-    const matchesActivo = filtroActivo === 'todas' ||
-      (filtroActivo === 'activas' && r.activo !== false) ||
-      (filtroActivo === 'inactivas' && r.activo === false)
-    if (!busqueda) return matchesActivo
-    const b = busqueda.toLowerCase()
-    return r.activo !== false && (r.nombre?.toLowerCase().includes(b) || r.sku_odoo?.toLowerCase().includes(b))
-  })
 
   const handleEliminar = async () => {
     if (!confirmDelete) return
@@ -258,6 +365,13 @@ function TabRecetas() {
     }
   }
 
+  const handleSortRecetas = (column) => {
+    setSortRecetas(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
   // Lógica de filtrado y comparación
   const displayData = useMemo(() => {
     const list = recetarios || []
@@ -304,24 +418,30 @@ function TabRecetas() {
     }))
 
     // 3. Retornar según el filtro seleccionado
-    if (filtroEstado === 'con_receta') return listConReceta
-    if (filtroEstado === 'sin_receta') return listSinReceta
+    let result
+    if (filtroEstado === 'con_receta') result = listConReceta
+    else if (filtroEstado === 'sin_receta') result = listSinReceta
+    else result = [...listConReceta, ...listSinReceta]
     
-    // Si es 'todas', combinamos ambas listas
-    return [...listConReceta, ...listSinReceta]
-  }, [recetarios, busqueda, filtroEstado, filtroActivo, odooProducts])
+    const getters = {
+      nombre: r => r.nombre || '',
+      sku_odoo: r => r.sku_odoo || '',
+      estado: r => r.esVirtual ? 'pendiente' : (r.activo === false ? 'inactiva' : 'activa'),
+      ingredientes: r => r.ingredientes?.length || 0,
+      costo_total: r => r.costo_total || 0,
+    }
+    const getter = getters[sortRecetas.column] || getters.nombre
+    return [...result].sort((a, b) => {
+      const cmp = compareValues(getter(a), getter(b))
+      return sortRecetas.direction === 'asc' ? cmp : -cmp
+    })
+  }, [recetarios, busqueda, filtroEstado, filtroActivo, odooProducts, productosParaImport, eqMap, sortRecetas])
 
   const handleDescargarPlantilla = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['Producto', 'SKU_Odoo', 'Ingrediente', 'SKU_Ing (codigo_legible)', 'Cantidad', 'Unidad', 'Cant x Compra', 'Costo_Unit'],
-      ['Bubble Tea', 'BB-TEA-M', 'Té Negro Base', 'PROD00001', 200, 'ml', 1, 0.012],
-      ['Bubble Tea', 'BB-TEA-M', 'Perlas de Tapioca', 'PROD00003', 50, 'g', 1, 0.08],
-      ['Yogo Fresa', 'YG-FRESA-M', 'Base de Yogur', 'PROD00005', 250, 'ml', 0.02],
-      ['Yogo Fresa', 'YG-FRESA-M', 'Fresas Congeladas', 'PROD00006', 80, 'g', 0.06],
-      ['Maracuya Fusion', 'MA-FUSION-M', 'Jugo de Maracuyá', 'PROD00008', 150, 'ml', 0.025],
-      ['Maracuya Fusion', 'MA-FUSION-M', 'Leche de Coco', 'PROD00009', 100, 'ml', 0.015],
-      ['Taro Boba', 'TA-BOBA-M', 'Polvo de Taro', 'PROD00002', 30, 'g', 0.15],
-      ['Taro Boba', 'TA-BOBA-M', 'Perlas de Tapioca', 'PROD00003', 50, 'g', 0.08],
+      ['Producto', 'SKU_Odoo', 'SKU_Template', 'Activo', 'Ingrediente', 'SKU_Ing', 'Producto ID', 'Cantidad Uso', 'Unidad Uso', 'Unidad Uso ID', 'UoM Compra', 'UoM Compra ID', 'Cant x Compra', 'Costo Unitario'],
+      ['Bubble Tea', 'BB-TEA-M', 'BB-TEA', 'Sí', 'Té Negro Base', 'PROD00001', '', 200, 'ml', '', 'Litro', '', 1, 0.012],
+      ['Bubble Tea', 'BB-TEA-M', 'BB-TEA', 'Sí', 'Perlas de Tapioca', 'PROD00003', '', 50, 'g', '', 'Kilogramo', '', 1, 0.08],
     ])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Recetas')
@@ -433,12 +553,12 @@ function TabRecetas() {
             <thead className="bg-slate-50 dark:bg-slate-700/50">
               <tr>
                 <th className="px-4 py-3 w-8"></th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">Producto Odoo</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">SKU</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">Estatus Receta</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">Ingredientes</th>
+                <SortableHeader label="Producto Odoo" column="nombre" sortConfig={sortRecetas} onSort={handleSortRecetas} />
+                <SortableHeader label="SKU" column="sku_odoo" sortConfig={sortRecetas} onSort={handleSortRecetas} />
+                <SortableHeader label="Estatus Receta" column="estado" sortConfig={sortRecetas} onSort={handleSortRecetas} align="center" />
+                <SortableHeader label="Ingredientes" column="ingredientes" sortConfig={sortRecetas} onSort={handleSortRecetas} align="center" />
 
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">Costo Total</th>
+                <SortableHeader label="Costo Total" column="costo_total" sortConfig={sortRecetas} onSort={handleSortRecetas} align="right" />
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">Acciones</th>
               </tr>
             </thead>
@@ -949,7 +1069,7 @@ function ModalImportExcel({ fileRef, preview, importando, onFileChange, onDescar
           <button onClick={onClose} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><X size={20} className="text-slate-500" /></button>
         </div>
         <div className="p-5 overflow-y-auto max-h-[calc(90vh-80px)] space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-400">Columnas: <span className="font-semibold">Producto | SKU_Odoo | Ingrediente | SKU_Ing | Cantidad | Unidad | Cant x Compra | Costo_Unit</span></p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Columnas: <span className="font-semibold">Producto | SKU_Odoo | SKU_Template | Activo | Ingrediente | SKU_Ing | Producto ID | Cantidad Uso | Unidad Uso | Unidad Uso ID | UoM Compra | UoM Compra ID | Cant x Compra | Costo Unitario</span></p>
           <button onClick={onDescargar} className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl"><Download size={16} /> Descargar plantilla</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={onFileChange} className="block text-sm text-slate-600" />
           {preview && (
@@ -1353,7 +1473,7 @@ function agruparPorOrden(movimientos) {
 // MODAL: Detalle de orden Odoo
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function ModalOrdenDetalle({ grupo, ubicaciones, unidadesDB, onClose, onEliminarItem, eliminando, onRequestDeleteItem }) {
+function ModalOrdenDetalle({ grupo, ubicaciones, unidadesDB, onClose, eliminando, onRequestDeleteItem }) {
   const [expandidos, setExpandidos] = useState({})
 
   const porProducto = {}
@@ -1707,6 +1827,7 @@ function TabSalidas() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOrders, setSelectedOrders] = useState(new Set())
   const [deletingBulk, setDeletingBulk] = useState(false)
+  const [sortSalidas, setSortSalidas] = useState({ column: 'fecha', direction: 'desc' })
 
   // Filters
   const [filterEstado, setFilterEstado] = useState('')
@@ -1811,10 +1932,6 @@ function TabSalidas() {
     })
   }, [ordenes, filterEstado, filterUbicacion, filterTipo, searchTerm])
 
-  // Pagination
-  const totalPages = Math.ceil(ordenesFiltradas.length / ITEMS_PER_PAGE)
-  const paginatedOrdenes = ordenesFiltradas.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-
   // Reset page when filters change
   useEffect(() => { setCurrentPage(1) }, [filterEstado, filterUbicacion, filterTipo, searchTerm])
 
@@ -1866,6 +1983,33 @@ function TabSalidas() {
       }
     })
   }
+
+  const handleSortSalidas = (column) => {
+    setSortSalidas(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  const ordenesOrdenadas = useMemo(() => {
+    const getters = {
+      orden: o => o.order_name || o.order_id || '',
+      productos: o => o.productos_odoo?.join(' ') || '',
+      ubicacion: o => ubicacionMap.get(o.ubicacion_id) || o.ubicacion_id || '',
+      ingredientes: o => o.num_ingredientes || 0,
+      costo: o => o.costo_total || 0,
+      fecha: o => o.fecha_creacion?.toDate ? o.fecha_creacion.toDate() : new Date(o.fecha_creacion || 0),
+      estado: o => o.estado || '',
+    }
+    const getter = getters[sortSalidas.column] || getters.fecha
+    return [...ordenesFiltradas].sort((a, b) => {
+      const cmp = compareValues(getter(a), getter(b))
+      return sortSalidas.direction === 'asc' ? cmp : -cmp
+    })
+  }, [ordenesFiltradas, sortSalidas, ubicacionMap])
+
+  const totalPages = Math.ceil(ordenesOrdenadas.length / ITEMS_PER_PAGE)
+  const paginatedOrdenes = ordenesOrdenadas.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
 
   return (
     <div className="space-y-4">
@@ -2003,13 +2147,13 @@ function TabSalidas() {
                         onChange={toggleSelectAll}
                         className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Orden</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Productos vendidos</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Ubicación</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Ing.</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Costo</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Fecha</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Estado</th>
+                    <SortableHeader label="Orden" column="orden" sortConfig={sortSalidas} onSort={handleSortSalidas} />
+                    <SortableHeader label="Productos vendidos" column="productos" sortConfig={sortSalidas} onSort={handleSortSalidas} />
+                    <SortableHeader label="Ubicación" column="ubicacion" sortConfig={sortSalidas} onSort={handleSortSalidas} />
+                    <SortableHeader label="Ing." column="ingredientes" sortConfig={sortSalidas} onSort={handleSortSalidas} align="center" />
+                    <SortableHeader label="Costo" column="costo" sortConfig={sortSalidas} onSort={handleSortSalidas} align="right" />
+                    <SortableHeader label="Fecha" column="fecha" sortConfig={sortSalidas} onSort={handleSortSalidas} />
+                    <SortableHeader label="Estado" column="estado" sortConfig={sortSalidas} onSort={handleSortSalidas} align="center" />
                     <th className="px-4 py-3 w-24"></th>
                   </tr>
                 </thead>
@@ -2143,7 +2287,6 @@ function TabSalidas() {
           ubicaciones={ubicaciones}
           unidadesDB={unidadesDB}
           onClose={() => setGrupoDetalle(null)}
-          onEliminarItem={executeDeleteItem}
           onRequestDeleteItem={requestDeleteItem}
           eliminando={eliminando}
         />

@@ -3721,16 +3721,26 @@ const firestoreService = {
     const creados = []
 
     for (const receta of recetas) {
-      const id = await getNextSequentialCode('REC')
+      let id = null
+      let exists = false
+      if (receta.sku_odoo) {
+        const existing = await getDocs(query(collection(db, 'salidas_odoo_recetas'), where('sku_odoo', '==', receta.sku_odoo)))
+        if (!existing.empty) {
+          id = existing.docs[0].id
+          exists = true
+        }
+      }
+      if (!id) id = await getNextSequentialCode('REC')
       const costoTotal = calcularCostoTotal(receta.ingredientes)
       const ref = doc(db, 'salidas_odoo_recetas', id)
-      batch.set(ref, {
+      const payload = {
         ...receta,
         costo_total: costoTotal,
-        activo: true,
-        fecha_creacion: serverTimestamp(),
+        activo: receta.activo !== false,
         ultima_actualizacion: serverTimestamp()
-      })
+      }
+      if (!exists) payload.fecha_creacion = serverTimestamp()
+      batch.set(ref, payload, { merge: true })
       creados.push(id)
     }
 
@@ -3887,7 +3897,7 @@ const firestoreService = {
  */
 function calcularCostoTotal(ingredientes = []) {
   return ingredientes.reduce((sum, ing) => {
-    const costo = (ing.costo_unitario || 0) * (ing.cantidad || 0)
+    const costo = ing.subtotal_efectivo ?? ((ing.costo_unitario || 0) * (ing.cantidad || 0))
     return sum + costo
   }, 0)
 }
