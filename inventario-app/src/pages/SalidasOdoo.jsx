@@ -5,7 +5,7 @@ import {
   BookOpen, Plus, Search, Download, Upload, Edit2, Trash2, Eye,
   ChevronDown, ChevronUp, X, Save, Package, DollarSign,
   FileSpreadsheet, CheckCircle, ArrowDownLeft, ArrowRightLeft,
-  MapPin, Clock, CheckCircle2, XCircle, Store, SlidersHorizontal, RefreshCw, Copy, AlertCircle
+  MapPin, Clock, CheckCircle2, XCircle, Store, SlidersHorizontal, RefreshCw, Copy, AlertCircle, GripVertical
 } from 'lucide-react'
 import { useSalidasOdoo } from '../hooks/useSalidasOdoo'
 import { useToastStore } from '../stores/toastStore'
@@ -94,6 +94,10 @@ function calcularCostoTotal(ingredientes = []) {
 
 function fmtCosto(n) {
   return typeof n === 'number' ? `$${n.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00'
+}
+
+function createIngredienteUiKey() {
+  return `ing-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 function exportarRecetarios(recetarios) {
@@ -297,7 +301,7 @@ function TabRecetas() {
   const [filtroEstado, setFiltroEstado] = useState('todas') // 'todas', 'con_receta', 'sin_receta'
   const [odooProducts, setOdooProducts] = useState([])
   const [sincronizando, setSincronizando] = useState(false)
-  const [expandido, setExpandido] = useState(null)
+  const [expandidos, setExpandidos] = useState(() => new Set())
   const [modalForm, setModalForm] = useState(false)
   const [modalImport, setModalImport] = useState(false)
   const [editando, setEditando] = useState(null)
@@ -370,6 +374,15 @@ function TabRecetas() {
       column,
       direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc'
     }))
+  }
+
+  const toggleExpandido = (recetaId) => {
+    setExpandidos(prev => {
+      const next = new Set(prev)
+      if (next.has(recetaId)) next.delete(recetaId)
+      else next.add(recetaId)
+      return next
+    })
   }
 
   // Lógica de filtrado y comparación
@@ -564,7 +577,7 @@ function TabRecetas() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {displayData.map(rec => (
-                <RecetaRow key={rec.id} rec={rec} expandido={expandido} setExpandido={setExpandido}
+                <RecetaRow key={rec.id} rec={rec} expandidos={expandidos} onToggleExpand={toggleExpandido}
                   canWrite={canWrite} canDel={canDel} unidadesDB={unidadesDB}
                   onEdit={() => { setEditando(rec); setModalForm(true) }}
                   onDelete={() => setConfirmDelete({ id: rec.id, nombre: rec.nombre })}
@@ -620,12 +633,12 @@ function TabRecetas() {
 
 // ─── Receta Row (expandable) ──────────────────────────────────────────────────
 
-function RecetaRow({ rec, expandido, setExpandido, canWrite, canDel, onEdit, onDelete, onCrear, onDuplicate, unidadesDB = [] }) {
-  const isOpen = expandido === rec.id
+function RecetaRow({ rec, expandidos, onToggleExpand, canWrite, canDel, onEdit, onDelete, onCrear, onDuplicate, unidadesDB = [] }) {
+  const isOpen = expandidos.has(rec.id)
   return (
     <>
       <tr className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer transition-colors ${rec.activo === false ? 'opacity-50' : ''}`}
-        onClick={() => setExpandido(isOpen ? null : rec.id)}>
+        onClick={() => onToggleExpand(rec.id)}>
         <td className="px-4 py-3">{isOpen ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}</td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
@@ -724,13 +737,15 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
   const initial = receta || { nombre: '', sku_odoo: '', sku_template: '', ingredientes: [] }
   const [form, setForm] = useState({
     nombre: initial.nombre || '', sku_odoo: initial.sku_odoo || '', sku_template: initial.sku_template || '',
-    ingredientes: initial.ingredientes?.length ? initial.ingredientes.map(ing => ({ ...ing })) : []
+    ingredientes: initial.ingredientes?.length ? initial.ingredientes.map(ing => ({ ...ing, _uiKey: ing._uiKey || createIngredienteUiKey() })) : []
   })
   const [activo, setActivo] = useState(receta ? (receta.activo !== false) : true)
   const toast = useToastStore()
   const [guardando, setGuardando] = useState(false)
   const [activeSearchRow, setActiveSearchRow] = useState(null)
   const [prodSearchTerm, setProdSearchTerm] = useState('')
+  const [draggedIngredienteIndex, setDraggedIngredienteIndex] = useState(null)
+  const [dragOverIngredienteIndex, setDragOverIngredienteIndex] = useState(null)
 
   const { data: productos = [], isLoading: loadingProductos } = useQuery({ queryKey: ['productos'], queryFn: () => dataService.getProductos() })
   const { data: unidadesDB = [] } = useQuery({ queryKey: ['config-unidades'], queryFn: () => dataService.getUnidadesMedida() })
@@ -760,8 +775,48 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const addIngrediente = () => {
-    setForm(f => ({ ...f, ingredientes: [...f.ingredientes, { nombre: '', sku: '', producto_id: null, especificacion: '', cantidad: 0, unidad_medida: '', costo_unitario: 0, consumption_unit_id: '', purchase_unit_id: '' }] }))
+    setForm(f => ({ ...f, ingredientes: [...f.ingredientes, { _uiKey: createIngredienteUiKey(), nombre: '', sku: '', producto_id: null, especificacion: '', cantidad: 0, unidad_medida: '', costo_unitario: 0, consumption_unit_id: '', purchase_unit_id: '' }] }))
     setTimeout(() => { setActiveSearchRow(form.ingredientes.length); setProdSearchTerm('') }, 50)
+  }
+
+  const moveIngrediente = (fromIndex, toIndex) => {
+    setForm(f => {
+      if (fromIndex === toIndex || fromIndex == null || toIndex == null || fromIndex < 0 || toIndex < 0 || fromIndex >= f.ingredientes.length || toIndex >= f.ingredientes.length) return f
+      const ingredientes = [...f.ingredientes]
+      const [moved] = ingredientes.splice(fromIndex, 1)
+      ingredientes.splice(toIndex, 0, moved)
+      return { ...f, ingredientes }
+    })
+  }
+
+  const resetDragState = () => {
+    setDraggedIngredienteIndex(null)
+    setDragOverIngredienteIndex(null)
+  }
+
+  const handleDragStartIngrediente = (index, event) => {
+    if (readOnly) return
+    setDraggedIngredienteIndex(index)
+    setDragOverIngredienteIndex(index)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+
+  const handleDragOverIngrediente = (index, event) => {
+    if (readOnly || draggedIngredienteIndex == null) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    if (dragOverIngredienteIndex !== index) setDragOverIngredienteIndex(index)
+  }
+
+  const handleDropIngrediente = (index, event) => {
+    if (readOnly || draggedIngredienteIndex == null) return
+    event.preventDefault()
+    const fromIndex = draggedIngredienteIndex
+    resetDragState()
+    if (fromIndex === index) return
+    moveIngrediente(fromIndex, index)
+    toast.success('Orden actualizado', 'Los componentes de la receta se reordenaron correctamente')
   }
 
   const selectProductForIngrediente = (i, prod) => {
@@ -817,7 +872,7 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
     const formPreparado = {
       ...form,
       activo,
-      ingredientes: form.ingredientes.map(ing => ({
+      ingredientes: form.ingredientes.map(({ _uiKey, ...ing }) => ({
         ...ing,
         cantidad: parseFloat(parseFloat(ing.cantidad).toFixed(3)) || 0
       }))
@@ -883,16 +938,18 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
                   <div className="overflow-y-auto overflow-x-visible flex-1">
                   <table className="w-full table-fixed">
                     <colgroup>
-                      <col className="w-[35%]" />
+                      <col className="w-[5%]" />
+                      <col className="w-[30%]" />
                       <col className="w-[12%]" />
                       <col className="w-[12%]" />
                       <col className="w-[13%]" />
                       <col className="w-[12%]" />
-                      <col className="w-[14%]" />
+                      <col className="w-[10%]" />
                       <col className="w-[6%]" />
                     </colgroup>
                     <thead className="bg-slate-50 dark:bg-slate-700/50 sticky top-0 z-10">
                       <tr>
+                        <th className="px-2 py-3"></th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">Producto</th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">UoM Compra</th>
                         <th className="px-3 py-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase">Costo/u</th>
@@ -904,7 +961,27 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
                       {form.ingredientes.map((ing, i) => (
-                        <tr key={i}>
+                        <tr
+                          key={ing._uiKey || i}
+                          onDragOver={e => handleDragOverIngrediente(i, e)}
+                          onDrop={e => handleDropIngrediente(i, e)}
+                          onDragEnd={resetDragState}
+                          className={dragOverIngredienteIndex === i && draggedIngredienteIndex !== i ? 'bg-primary-50/80 dark:bg-primary-900/10' : ''}
+                        >
+                          <td className="px-2 py-2.5 text-center">
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                draggable
+                                onDragStart={e => handleDragStartIngrediente(i, e)}
+                                onDragEnd={resetDragState}
+                                className="inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 cursor-grab active:cursor-grabbing dark:hover:bg-slate-700"
+                                title="Reordenar componente"
+                              >
+                                <GripVertical size={14} />
+                              </button>
+                            )}
+                          </td>
                           <td className="px-3 py-2">
                             <div className="relative">
                               {ing.producto_id && activeSearchRow !== i ? (
