@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import Button from '../common/Button'
 import Alert from '../common/Alert'
 import LoadingSpinner from '../common/LoadingSpinner'
-import { Package, CheckCircle, AlertCircle, X, Search, Trash2 } from 'lucide-react'
+import { Package, CheckCircle, AlertCircle, X, Search, Trash2, Maximize2, Minimize2 } from 'lucide-react'
 import dataService from '../../services/dataService'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useToastStore } from '../../stores/toastStore'
@@ -31,6 +31,7 @@ export default function ConteoExecute({ conteo, onClose, onSave, isLoading: isSa
   const [tempValues, setTempValues] = useState({}) // Valores temporales mientras se edita
   const [confirmEliminar, setConfirmEliminar] = useState(null) // Producto a confirmar eliminación
   const [eliminandoId, setEliminandoId] = useState(null)
+  const [isExpanded, setIsExpanded] = useState(false)
   const autoSaveTimer = useRef(null)
 
   // Cargar todos los productos
@@ -419,8 +420,12 @@ export default function ConteoExecute({ conteo, onClose, onSave, isLoading: isSa
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-card-hover max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-card-hover w-full overflow-hidden flex flex-col transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-3xl max-w-7xl max-h-[95vh]'
+      }`}>
         {/* Header con Progreso Integrado */}
         <div className={`relative overflow-hidden ${editMode ? 'bg-gradient-to-r from-amber-500 to-orange-500' : 'bg-gradient-ocean'} p-4 flex-shrink-0`}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
@@ -453,13 +458,22 @@ export default function ConteoExecute({ conteo, onClose, onSave, isLoading: isSa
                   </div>
                 </div>
 
-                {/* Botón cerrar */}
-                <button
-                  onClick={onClose}
-                  className="p-1.5 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
-                >
-                  <X className="text-white" size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(v => !v)}
+                    className="p-1.5 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
+                    title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+                  >
+                    {isExpanded ? <Minimize2 className="text-white" size={18} /> : <Maximize2 className="text-white" size={18} />}
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="p-1.5 hover:bg-white/20 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    <X className="text-white" size={20} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

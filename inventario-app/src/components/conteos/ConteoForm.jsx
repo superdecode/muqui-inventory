@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import Button from '../common/Button'
 import Alert from '../common/Alert'
 import LoadingSpinner from '../common/LoadingSpinner'
-import { MapPin, AlertCircle, X, Package } from 'lucide-react'
+import { MapPin, AlertCircle, X, Package, Maximize2, Minimize2 } from 'lucide-react'
 import dataService from '../../services/dataService'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -16,6 +16,7 @@ export default function ConteoForm({ onClose, onSave, isLoading = false }) {
   })
   const [error, setError] = useState('')
   const [filterCategoria, setFilterCategoria] = useState('')
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Cargar ubicaciones desde la base de datos
   const { data: todasUbicaciones = [], isLoading: isLoadingUbicaciones } = useQuery({
@@ -118,8 +119,12 @@ export default function ConteoForm({ onClose, onSave, isLoading = false }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-card-hover max-w-2xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-card-hover w-full overflow-hidden flex flex-col transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-3xl max-w-2xl max-h-[90vh]'
+      }`}>
         {/* Header */}
         <div className="relative overflow-hidden bg-gradient-ocean p-6">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
@@ -128,16 +133,26 @@ export default function ConteoForm({ onClose, onSave, isLoading = false }) {
               <h2 className="text-2xl font-bold text-white">Programar Conteo</h2>
               <p className="text-white/90">Crea un nuevo conteo de inventario</p>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-            >
-              <X className="text-white" size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(v => !v)}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+              >
+                {isExpanded ? <Minimize2 className="text-white" size={20} /> : <Maximize2 className="text-white" size={20} />}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <X className="text-white" size={24} />
+              </button>
+            </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-200px)] space-y-6">
+        <form onSubmit={handleSubmit} className={`p-6 overflow-y-auto space-y-6 ${isExpanded ? 'flex-1 min-h-0' : 'max-h-[calc(90vh-200px)]'}`}>
           {/* Error Alert */}
           {error && (
             <Alert type="error" className="mb-4">

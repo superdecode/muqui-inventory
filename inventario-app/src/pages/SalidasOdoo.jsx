@@ -5,7 +5,7 @@ import {
   BookOpen, Plus, Search, Download, Upload, Edit2, Trash2, Eye,
   ChevronDown, ChevronUp, X, Save, Package, DollarSign,
   FileSpreadsheet, CheckCircle, ArrowDownLeft, ArrowRightLeft,
-  MapPin, Clock, CheckCircle2, XCircle, Store, SlidersHorizontal, RefreshCw, Copy, AlertCircle, GripVertical
+  MapPin, Clock, CheckCircle2, XCircle, Store, SlidersHorizontal, RefreshCw, Copy, AlertCircle, GripVertical, Maximize2, Minimize2
 } from 'lucide-react'
 import { useSalidasOdoo } from '../hooks/useSalidasOdoo'
 import { useToastStore } from '../stores/toastStore'
@@ -744,6 +744,7 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
   const [guardando, setGuardando] = useState(false)
   const [activeSearchRow, setActiveSearchRow] = useState(null)
   const [prodSearchTerm, setProdSearchTerm] = useState('')
+  const [isExpanded, setIsExpanded] = useState(false)
   const [draggedIngredienteIndex, setDraggedIngredienteIndex] = useState(null)
   const [dragOverIngredienteIndex, setDragOverIngredienteIndex] = useState(null)
 
@@ -893,13 +894,25 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-2xl w-full flex flex-col transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-2xl max-w-5xl max-h-[85vh]'
+      }`}>
         <div className="relative overflow-hidden bg-gradient-ocean p-5 shrink-0 rounded-t-2xl">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16" />
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-3"><BookOpen className="text-white" size={22} /><h2 className="text-xl font-bold text-white">{receta ? 'Editar Receta' : 'Nueva Receta'}</h2></div>
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(v => !v)}
+                className="p-1.5 hover:bg-white/20 rounded-xl"
+                title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+              >
+                {isExpanded ? <Minimize2 className="text-white" size={18} /> : <Maximize2 className="text-white" size={18} />}
+              </button>
               <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-xl"><X className="text-white" size={20} /></button>
             </div>
           </div>
