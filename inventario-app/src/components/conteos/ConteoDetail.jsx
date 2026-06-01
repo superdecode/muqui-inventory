@@ -452,10 +452,10 @@ export default function ConteoDetail({ conteo, onClose, onEdit, onCancelar, isCa
           </div>
         </div>
 
-        <div className="p-5 overflow-y-auto flex-1 space-y-4">
+        <div className="p-5 overflow-y-auto flex-1 min-h-0 flex flex-col gap-4">
           {/* Tab: Detalles */}
           {activeTab === 'detalles' && (
-            <>
+            <div className="flex flex-col flex-1 min-h-0 gap-4">
           {/* Tarjeta de Ubicación y Tipo */}
           <div className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -488,7 +488,7 @@ export default function ConteoDetail({ conteo, onClose, onEdit, onCancelar, isCa
           </div>
 
           {/* Productos */}
-          <div className="max-h-[24rem] overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
               <Package size={24} className="text-primary-600" />
               Productos Contados {detalles.length > 0 && `(${detalles.length} items)`}
@@ -504,8 +504,8 @@ export default function ConteoDetail({ conteo, onClose, onEdit, onCancelar, isCa
                 <p className="text-slate-600 dark:text-slate-400 text-lg">No hay productos contados en este conteo</p>
               </div>
             ) : (
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-                <div className="overflow-y-auto max-h-[20rem]">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col">
+                <div className="overflow-y-auto flex-1 min-h-0">
                   <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                       <tr>
@@ -603,7 +603,7 @@ export default function ConteoDetail({ conteo, onClose, onEdit, onCancelar, isCa
               <p className="text-slate-700 dark:text-slate-300">{conteo.observaciones}</p>
             </div>
           )}
-            </>
+            </div>
           )}
 
           {/* Tab: Logs de Actividad */}
