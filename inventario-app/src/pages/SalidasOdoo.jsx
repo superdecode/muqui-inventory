@@ -917,8 +917,8 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
             </div>
           </div>
         </div>
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <div className="p-6 overflow-y-auto flex-1 space-y-4">
+        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+          <div className="p-6 flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
               <div className="md:col-span-3">
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Nombre del producto Odoo</label>
@@ -936,7 +936,7 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
                   className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-primary-500 font-mono disabled:opacity-60" />
               </div>
             </div>
-            <div className="flex flex-col" style={{ minHeight: '300px', maxHeight: '500px' }}>
+            <div className="flex flex-col flex-1 min-h-0">
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <Package size={18} className="text-primary-600" /> Ingredientes (Materiales)
@@ -944,11 +944,11 @@ function ModalReceta({ receta, readOnly, onClose, onCreate, onUpdate }) {
                 </h4>
                 {!readOnly && <Button size="sm" onClick={addIngrediente}><Plus size={15} className="mr-1.5" /> Agregar</Button>}
               </div>
-              <div className="border border-slate-200 dark:border-slate-600 rounded-xl flex-1 flex flex-col overflow-hidden">
+              <div className="border border-slate-200 dark:border-slate-600 rounded-xl flex-1 min-h-0 flex flex-col overflow-hidden">
                 {form.ingredientes.length === 0 ? (
-                  <div className="py-10 text-center"><Package size={36} className="mx-auto text-slate-300 mb-2" /><p className="text-sm text-slate-500">Sin ingredientes. Busca y agrega productos del inventario.</p></div>
+                  <div className="py-10 text-center flex-1 flex flex-col items-center justify-center"><Package size={36} className="mx-auto text-slate-300 mb-2" /><p className="text-sm text-slate-500">Sin ingredientes. Busca y agrega productos del inventario.</p></div>
                 ) : (
-                  <div className="overflow-y-auto overflow-x-visible flex-1">
+                  <div className="overflow-y-auto overflow-x-visible flex-1 min-h-0">
                   <table className="w-full table-fixed">
                     <colgroup>
                       <col className="w-[5%]" />

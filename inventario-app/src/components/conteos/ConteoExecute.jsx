@@ -492,7 +492,7 @@ export default function ConteoExecute({ conteo, onClose, onSave, isLoading: isSa
           </div>
         )}
 
-        <form onSubmit={handleSubmit} onKeyDown={(e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault() }} className="flex-1 flex flex-col overflow-hidden">
+        <form onSubmit={handleSubmit} onKeyDown={(e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault() }} className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="p-4 space-y-2 flex-shrink-0">
             {/* Error Alert */}
             {error && (
@@ -592,7 +592,7 @@ export default function ConteoExecute({ conteo, onClose, onSave, isLoading: isSa
           </div>
 
           {/* Lista de Productos - Scrollable */}
-          <div className="flex-1 overflow-y-auto px-4 pb-4">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
             <div className="space-y-1.5">
               {productosFiltrados.map((producto, index) => {
               const diferencia = getDiferencia(producto)
