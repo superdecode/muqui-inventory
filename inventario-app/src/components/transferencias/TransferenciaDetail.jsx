@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Button from '../common/Button'
 import LoadingSpinner from '../common/LoadingSpinner'
-import { Package, MapPin, Calendar, FileText, CheckCircle, X, Download, Edit3, Ban, AlertTriangle, Factory, ArrowRight, Pencil } from 'lucide-react'
+import { Package, MapPin, Calendar, FileText, CheckCircle, X, Download, Edit3, Ban, AlertTriangle, Factory, ArrowRight, Pencil, Maximize2, Minimize2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Timestamp } from 'firebase/firestore'
@@ -71,6 +71,7 @@ export default function TransferenciaDetail({
   const [editingFechaDoc, setEditingFechaDoc] = useState(false)
   const [fechaDocumentoEdit, setFechaDocumentoEdit] = useState('')
   const [isSavingFechaDoc, setIsSavingFechaDoc] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Cancel modal state
   const [showCancelModal, setShowCancelModal] = useState(false)
@@ -530,8 +531,12 @@ export default function TransferenciaDetail({
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-card-hover max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-card-hover w-full overflow-hidden flex flex-col transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-3xl max-w-6xl max-h-[90vh]'
+      }`}>
         {/* Header */}
         <div className="relative overflow-hidden bg-gradient-ocean p-4 flex-shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
@@ -600,6 +605,14 @@ export default function TransferenciaDetail({
                     <Download className="text-white" size={20} />
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(v => !v)}
+                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                  title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+                >
+                  {isExpanded ? <Minimize2 className="text-white" size={20} /> : <Maximize2 className="text-white" size={20} />}
+                </button>
                 <button
                   onClick={onClose}
                   className="p-2 hover:bg-white/20 rounded-xl transition-colors"

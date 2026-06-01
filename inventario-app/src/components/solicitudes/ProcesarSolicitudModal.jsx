@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import Button from '../common/Button'
 import Alert from '../common/Alert'
 import LoadingSpinner from '../common/LoadingSpinner'
-import { X, Package, ArrowRight, CheckCircle, AlertTriangle, MapPin, Trash2, Plus, Search } from 'lucide-react'
+import { X, Package, ArrowRight, CheckCircle, AlertTriangle, MapPin, Trash2, Plus, Search, Maximize2, Minimize2 } from 'lucide-react'
 import dataService from '../../services/dataService'
 
 export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar, isLoading = false }) {
@@ -14,6 +14,7 @@ export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar,
   const [mostrarAgregar, setMostrarAgregar] = useState(false)
   const [busquedaProducto, setBusquedaProducto] = useState('')
   const [productosOriginales, setProductosOriginales] = useState([])
+  const [isExpanded, setIsExpanded] = useState(false)
   // Map of productoId -> stock (loaded via calcularStockDisponible for accuracy)
   const [stockMap, setStockMap] = useState({})
 
@@ -201,8 +202,12 @@ export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar,
   if (!solicitud) return null
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-xl w-full overflow-hidden flex flex-col transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-2xl max-w-3xl max-h-[90vh]'
+      }`}>
         {/* Header */}
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6">
           <div className="flex items-center justify-between">
@@ -219,12 +224,22 @@ export default function ProcesarSolicitudModal({ solicitud, onClose, onProcesar,
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-            >
-              <X className="text-white" size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(v => !v)}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+              >
+                {isExpanded ? <Minimize2 className="text-white" size={20} /> : <Maximize2 className="text-white" size={20} />}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <X className="text-white" size={24} />
+              </button>
+            </div>
           </div>
         </div>
 

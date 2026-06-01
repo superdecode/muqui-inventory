@@ -4,7 +4,7 @@ import Button from '../common/Button'
 import Alert from '../common/Alert'
 import UoMBadge from '../common/UoMBadge'
 import LoadingSpinner from '../common/LoadingSpinner'
-import { Search, Package, ArrowRight, AlertCircle, X, Triangle, Trash2 } from 'lucide-react'
+import { Search, Package, ArrowRight, AlertCircle, X, Triangle, Trash2, Maximize2, Minimize2 } from 'lucide-react'
 import dataService from '../../services/dataService'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -18,6 +18,7 @@ export default function SolicitudForm({ onClose, onSave, onEnviar, isLoading = f
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedProductos, setSelectedProductos] = useState([])
   const [error, setError] = useState('')
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Cargar ubicaciones
   const { data: todasUbicaciones = [], isLoading: isLoadingUbicaciones } = useQuery({
@@ -213,8 +214,12 @@ export default function SolicitudForm({ onClose, onSave, onEnviar, isLoading = f
   const isLoadingData = isLoadingUbicaciones || isLoadingProductos
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-xl w-full overflow-hidden flex flex-col transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-2xl max-w-4xl max-h-[90vh]'
+      }`}>
         {/* Header */}
         <div className="bg-gradient-to-r from-[#004AFF] to-[#002980] p-6">
           <div className="flex items-center justify-between">
@@ -231,12 +236,22 @@ export default function SolicitudForm({ onClose, onSave, onEnviar, isLoading = f
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-            >
-              <X className="text-white" size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(v => !v)}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+              >
+                {isExpanded ? <Minimize2 className="text-white" size={20} /> : <Maximize2 className="text-white" size={20} />}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <X className="text-white" size={24} />
+              </button>
+            </div>
           </div>
         </div>
 

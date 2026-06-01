@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { X } from 'lucide-react'
+import { X, Maximize2, Minimize2 } from 'lucide-react'
 import ProduccionForm from './ProduccionForm'
 import LoadingSpinner from '../common/LoadingSpinner'
 import dataService from '../../services/dataService'
 
 export default function ProduccionEditModal({ movimiento, onClose, onSave }) {
   const [isLoading, setIsLoading] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Cargar los detalles y datos del movimiento
   const { data: detalles = [], isLoading: isLoadingDetalles } = useQuery({
@@ -93,8 +94,12 @@ export default function ProduccionEditModal({ movimiento, onClose, onSave }) {
   const formKey = `form-${movimiento.id}-${dataHash}`
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-card-hover max-w-4xl w-full max-h-[95vh] overflow-hidden flex flex-col my-4">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-card-hover w-full overflow-hidden flex flex-col my-4 transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-3xl max-w-4xl max-h-[95vh]'
+      }`}>
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-600 to-orange-600 p-6 rounded-t-3xl flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -104,12 +109,22 @@ export default function ProduccionEditModal({ movimiento, onClose, onSave }) {
                 Código: {movimiento.codigo_legible || `OP-${movimiento.id?.substring(0, 8)}`}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <X className="text-white" size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(v => !v)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+              >
+                {isExpanded ? <Minimize2 className="text-white" size={20} /> : <Maximize2 className="text-white" size={20} />}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="text-white" size={24} />
+              </button>
+            </div>
           </div>
         </div>
 

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import Button from '../common/Button'
 import LoadingSpinner from '../common/LoadingSpinner'
-import { X, Circle, Package, Calendar, MapPin, ExternalLink, XCircle, Send, Edit, CheckCircle, Trash2 } from 'lucide-react'
+import { X, Circle, Package, Calendar, MapPin, ExternalLink, XCircle, Send, Edit, CheckCircle, Trash2, Maximize2, Minimize2 } from 'lucide-react'
 import dataService from '../../services/dataService'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -36,6 +36,7 @@ export default function SolicitudDetail({
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [motivoCancelacion, setMotivoCancelacion] = useState('')
   const [activeTab, setActiveTab] = useState('detalles') // 'detalles' | 'logs'
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false)
@@ -118,8 +119,12 @@ export default function SolicitudDetail({
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-xl w-full overflow-hidden flex flex-col transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-2xl max-w-3xl max-h-[90vh]'
+      }`}>
         {/* Header */}
         <div className="bg-gradient-to-r from-[#004AFF] to-[#002980] p-4">
           <div className="flex items-center justify-between">
@@ -157,12 +162,22 @@ export default function SolicitudDetail({
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-            >
-              <X className="text-white" size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(v => !v)}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+              >
+                {isExpanded ? <Minimize2 className="text-white" size={20} /> : <Maximize2 className="text-white" size={20} />}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <X className="text-white" size={24} />
+              </button>
+            </div>
           </div>
         </div>
 

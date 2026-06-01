@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Button from '../common/Button'
 import Alert from '../common/Alert'
 import LoadingSpinner from '../common/LoadingSpinner'
-import { Search, Plus, X, User, ShoppingCart, ArrowRightLeft, AlertCircle, Package, Phone, MapPin, CreditCard, Factory } from 'lucide-react'
+import { Search, Plus, X, User, ShoppingCart, ArrowRightLeft, AlertCircle, Package, Phone, MapPin, CreditCard, Factory, Maximize2, Minimize2 } from 'lucide-react'
 import dataService from '../../services/dataService'
 import { useAuthStore } from '../../stores/authStore'
 import { useToastStore } from '../../stores/toastStore'
@@ -119,6 +119,7 @@ function ProveedorModal({ isOpen, onClose, onCreate }) {
 }
 
 export default function EntradaForm({ onClose, onSave, isLoading = false }) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const { user } = useAuthStore()
   const toast = useToastStore()
   const queryClient = useQueryClient()
@@ -354,8 +355,12 @@ export default function EntradaForm({ onClose, onSave, isLoading = false }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-card-hover max-w-6xl w-full max-h-[95vh] overflow-hidden">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      <div className={`bg-white dark:bg-slate-800 shadow-card-hover w-full overflow-hidden flex flex-col transition-all duration-300 ${
+        isExpanded
+          ? 'rounded-2xl max-w-[calc(100vw-1.5rem)] lg:max-w-[calc(100vw-7rem)] h-[calc(100vh-1.5rem)]'
+          : 'rounded-3xl max-w-6xl max-h-[95vh]'
+      }`}>
         {/* Header */}
         <div className="relative overflow-hidden bg-gradient-ocean p-6">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
@@ -365,12 +370,22 @@ export default function EntradaForm({ onClose, onSave, isLoading = false }) {
                 <h2 className="text-2xl font-bold text-white">Nueva Entrada</h2>
                 <p className="text-white/90">Selecciona el tipo de entrada</p>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-              >
-                <X className="text-white" size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(v => !v)}
+                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                  title={isExpanded ? 'Minimizar vista' : 'Ampliar vista'}
+                >
+                  {isExpanded ? <Minimize2 className="text-white" size={20} /> : <Maximize2 className="text-white" size={20} />}
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                >
+                  <X className="text-white" size={24} />
+                </button>
+              </div>
             </div>
             {/* Segmented Control */}
             <div className="flex gap-1 bg-white/20 rounded-xl p-1">
@@ -410,7 +425,7 @@ export default function EntradaForm({ onClose, onSave, isLoading = false }) {
 
         {/* Producción Form (separate component) */}
         {tipoEntrada === 'PRODUCCION' ? (
-          <div className="p-6 overflow-y-auto max-h-[calc(95vh-200px)]">
+          <div className={`p-6 overflow-y-auto ${isExpanded ? 'flex-1 min-h-0' : 'max-h-[calc(95vh-200px)]'}`}>
             <ProduccionForm
               onClose={onClose}
               onSave={onSave}
@@ -418,7 +433,7 @@ export default function EntradaForm({ onClose, onSave, isLoading = false }) {
             />
           </div>
         ) : (
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(95vh-200px)] space-y-6">
+        <form onSubmit={handleSubmit} className={`p-6 overflow-y-auto space-y-6 ${isExpanded ? 'flex-1 min-h-0' : 'max-h-[calc(95vh-200px)]'}`}>
           {/* Error Alert */}
           {error && (
             <Alert type="error" className="mb-4">
